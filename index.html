@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Excel Reader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        
+        h1 {
+            text-align: center;
+        }
+        
+        form {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: inline-block;
+            margin-bottom: 10px;
+            padding: 8px 15px;
+            font-size: 16px;
+            background-color: #3366CC;
+            color: #ffffff;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        label:hover {
+            background-color: #4276D7;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .custom-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: #ffffff;
+            cursor: pointer;
+            margin-right: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .custom-button:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+        
+        .custom-button:active {
+            background-color: #45A049;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        
+        .custom-button:focus {
+            outline: none;
+        }
+        
+        #tableData {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        table {
+            margin: 0 auto;
+            border-collapse: collapse;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            overflow-x: auto;
+        }
+        
+        th,
+        td {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            color: #3366CC;
+            /* Heading Text Color */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            /* Heading Text Shadow */
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Excel Reader</h1>
+    <form>
+        <label for="excelFile">Select Excel File:</label>
+        <input type="file" id="excelFile" name="excelFile" accept=".xlsx, .xls" onchange="updateSelectedFileLabel()">
+        <br>
+        <div id="selectedFileLabel"></div>
+        <!-- Added element to display the selected file name -->
+        <br>
+        <button type="button" class="custom-button" onclick="handleTableButtonClick('diplaytable')">Display excel data</button>
+        <button type="button" class="custom-button" onclick="handleTableButtonClick('tbl_cat')">Insert in Category Table</button>
+        <button type="button" class="custom-button" onclick="handleTableButtonClick('tbl_type_price')">Insert in Price Table</button>
+        <button type="button" class="custom-button" onclick="handleTableButtonClick('tbl_event')">Insert in Event Table</button>
+    </form>
+    <div id="tableData"></div>
+
+    <script>
+        function updateSelectedFileLabel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            const selectedFileLabel = document.getElementById('selectedFileLabel');
+            if (file) {
+                selectedFileLabel.textContent = "Selected File: " + file.name;
+            } else {
+                selectedFileLabel.textContent = "";
+            }
+        }
+
+        function handleTableButtonClick(tableName) {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please select an Excel file.");
+                return;
+            }
+
+            // Display the chosen file name
+            updateSelectedFileLabel();
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, {
+                    type: 'array'
+                });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(sheet, {
+                    header: 1
+                });
+
+                let tableHtml = "<h2>Data from the Excel file:</h2>";
+                tableHtml += "<table>";
+                for (let i = 0; i < jsonData.length; i++) {
+                    tableHtml += "<tr>";
+                    for (let j = 0; j < jsonData[i].length; j++) {
+                        tableHtml += "<td>" + jsonData[i][j] + "</td>";
+                    }
+                    tableHtml += "</tr>";
+                }
+                tableHtml += "</table>";
+
+                document.getElementById('tableData').innerHTML = tableHtml;
+
+                // Send the data to the PHP script for insertion
+                if (tableName !== "diplaytable") {
+                    alert("Data Insertion in process please check database!")
+                    sendDataToPhp(jsonData, tableName);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        function sendDataToPhp(data, tableName) {
+            const xhr = new XMLHttpRequest();
+            const url = "process.php";
+
+            // Prepare the data to be sent as a JSON string
+            const postData = JSON.stringify({
+                tableData: data,
+                tableName: tableName
+            });
+
+            xhr.open("POST", url, true);
+            xhr.setRequestHeader("Content-type", "application/json");
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                    console.log(xhr.responseText);
+                }
+            };
+
+            xhr.send(postData);
+        }
+    </script>
+
+    <!-- Include XLSX library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</body>
+
+</html>
